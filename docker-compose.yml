@@ -1,0 +1,43 @@
+services:
+
+  redis:
+    image: redis:7
+    container_name: creatorpay-redis
+    ports:
+      - "6380:6379"
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: creatorpay-auth
+
+    env_file:
+      - ./services/auth-service/.env
+
+    environment:
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+      REDIS_HOST: redis
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    depends_on:
+      - redis
+
+    ports:
+      - "4001:4001"
+
+  migration:
+    build: ./services/auth-service
+    container_name: creatorpay-migration
+
+    env_file:
+      - ./services/auth-service/.env
+
+    environment:
+      DB_HOST: host.docker.internal
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    command: ["npm", "run", "setup"]
