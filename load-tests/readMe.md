@@ -2,7 +2,7 @@
 
 This directory contains **load testing scripts** for the CreatorPay backend.
 
-We use **k6** to simulate high traffic scenarios and validate system performance under load.
+We use **k6** to simulate realistic traffic patterns and evaluate system performance under load.
 
 ---
 
@@ -49,96 +49,97 @@ k6 run load-tests/signup-test.js
 
 # 📁 Available Test Scripts
 
+---
+
 ## 1️⃣ Signup Load Test
 
 **File:** `signup-test.js`
 
-### Purpose
+### 🎯 Purpose
 
-Simulates large-scale user registration.
+Simulates large-scale user registration to test:
 
-### Configuration
+* Database write performance
+* API stability under load
 
-* 1000 virtual users (VUs)
-* 10 iterations each
-* Total = **10,000 users**
+---
 
-### Features
+### ⚙️ Configuration
+
+* Gradual ramp-up load (staged traffic)
+* Dynamic user generation
+* Controlled request pacing
+
+---
+
+### ✨ Features
 
 * Generates **unique emails**
-* Prevents duplicate user errors
-* Tests database write performance
+* Handles duplicate user scenarios gracefully
+* Tracks:
 
-### Run
+  * Success rate
+  * Latency (avg, p95)
+  * Custom metrics
+
+---
+
+### ▶️ Run
 
 ```bash
 k6 run load-tests/signup-test.js
 ```
 
-# 📊 Load Test Results
-
-## 🧪 Signup Load Test (10,000 Users)
-
-**Script:** `signup-test.js`
-**Scenario:** 1000 Virtual Users × 10 iterations each
-**Total Target Requests:** 10,000
-
 ---
 
-## 📈 Execution Summary
-
-```
-Total Requests Executed: 6,484
-Dropped Iterations:      3,516
-Test Duration:           ~2 minutes
-```
-
----
-
-## ✅ Success Rate
-
-```
-Checks Passed:  6,477
-Checks Failed:  7
-Success Rate:   99.89%
-```
-
-✔ System handled majority of requests successfully
-⚠️ Minor failures due to timeouts under heavy load
-
----
-
-## ⏱️ Latency Metrics
-
-| Metric                | Value          |
-| --------------------- | -------------- |
-| Average Response Time | ~19.95 seconds |
-| Median (p50)          | ~20.44 seconds |
-| p90                   | ~24.38 seconds |
-| p95                   | ~24.46 seconds |
-| Max                   | ~60 seconds    |
-
----
-
----
-
-## 2️⃣ Auth Flow Test
+## 2️⃣ Auth Flow Load Test
 
 **File:** `auth-load-test.js`
 
-### Flow
+---
+
+### 🔄 Flow
 
 ```text
-Login → Protected Route → Refresh → Logout
+Login → Protected Route → Refresh Token → Logout
 ```
 
-### Purpose
+---
 
-* Tests full authentication lifecycle
-* Validates token handling
-* Measures end-to-end latency
+### 🎯 Purpose
 
-### Run
+Tests the **complete authentication lifecycle**:
+
+* Login performance
+* JWT validation (protected routes)
+* Refresh token flow (Redis)
+* Logout handling
+
+---
+
+### ⚙️ Configuration
+
+* Gradual ramp-up (realistic traffic simulation)
+* Multiple concurrent users
+* Reusable test users (10k pool)
+
+---
+
+### ✨ Features
+
+* Custom metrics:
+
+  * Login duration
+  * Success rate
+* Threshold validation:
+
+  * p95 latency
+  * failure rate
+* Debug logging for failed requests
+
+---
+
+### ▶️ Run
 
 ```bash
 k6 run load-tests/auth-load-test.js
@@ -146,56 +147,122 @@ k6 run load-tests/auth-load-test.js
 
 ---
 
-# 📊 Metrics to Watch
+# 📊 Test Reports & Insights
 
-After running tests, focus on:
+Each test generates:
 
-| Metric            | Meaning           |
-| ----------------- | ----------------- |
-| http_req_duration | Request latency   |
-| http_req_failed   | Failure rate      |
-| checks_succeeded  | Test success rate |
-| vus               | Active users      |
+## ✅ Console Summary
+
+Includes:
+
+* Total requests
+* Success rate
+* Average latency
+* p95 latency (critical metric)
 
 ---
 
-# ⚠️ Notes
+## ✅ JSON Report
 
-* Ensure **Auth Service is running** on `http://localhost:4001`
-* Ensure PostgreSQL and Redis are running
-* Signup test creates real users → database will grow
+Generated automatically:
+
+```
+auth-summary.json
+signup-summary.json
+```
+
+---
+
+### 📌 Key Metrics to Watch
+
+| Metric            | Meaning                         |
+| ----------------- | ------------------------------- |
+| http_req_duration | Request latency                 |
+| p(95)             | 95% requests below this latency |
+| http_req_failed   | Failure rate                    |
+| checks            | Functional correctness          |
+| vus               | Concurrent users                |
+
+---
+
+# 🧠 How to Evaluate Results
+
+## ✅ Healthy System
+
+* p95 latency < **300–500ms**
+* success rate > **95%**
+* minimal timeouts
+
+---
+
+## ❌ Problem Indicators
+
+* High latency (>1s)
+* Increasing error rate
+* Dropped iterations
+* Timeouts under load
+
+---
+
+# ⚠️ Prerequisites
+
+Before running tests, ensure:
+
+* Auth Service running at:
+
+  ```
+  http://localhost:4001
+  ```
+* PostgreSQL is running
+* Redis is running
+
+---
+
+# 🧪 Testing Strategy
+
+Avoid jumping directly to high load.
+
+Use gradual scaling:
+
+```text
+100 → 300 → 500 → 1000 users
+```
 
 ---
 
 # 🧠 Best Practices
 
-* Run tests on **clean database**
-* Avoid duplicate emails (handled in script)
-* Monitor CPU and memory during tests
-* Start with smaller loads before scaling
+* Use a **clean database** before signup tests
+* Monitor:
+
+  * CPU usage
+  * Memory usage
+* Keep bcrypt cost low during load testing
+* Ensure Redis is properly connected
 
 ---
 
-# 🔥 Future Tests (Planned)
+# 🔥 Future Enhancements
 
-* Login spike test
-* Rate limit testing (brute force simulation)
-* Kafka-based like system (100k likes/min)
-* Distributed system performance testing
+* Spike testing (sudden traffic bursts)
+* Rate-limit attack simulation
+* Distributed load testing (multi-node k6)
+* Kafka-based async processing tests
+* 100k requests/min architecture validation
 
 ---
 
 # 🎯 Goal
 
-These tests demonstrate:
+These tests validate:
 
-* High-concurrency backend handling
-* Microservice readiness
-* Real-world system behavior under load
+* Backend scalability under concurrency
+* Authentication system performance
+* Microservice readiness for real-world traffic
 
 ---
 
-# 👨‍💻 Author
+# 👨‍💻 Project
 
-CreatorPay Backend System
-Distributed Microservices Architecture Project
+**CreatorPay**
+Distributed Microservices Backend System

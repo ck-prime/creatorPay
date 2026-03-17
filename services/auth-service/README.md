@@ -1,62 +1,62 @@
-# CreatorPay — Auth Service
+# 🚀 CreatorPay — Auth Service
 
-The **Auth Service** handles authentication and authorization for the CreatorPay platform.
+The **Auth Service** handles authentication, authorization, and account security for the CreatorPay platform.
 
-It provides APIs for:
+It is designed as a **scalable microservice** with support for:
 
-* User registration
-* User login
 * JWT authentication
-* Password hashing
-* Request validation
-* Redis-based security protections
-
-The service is designed as an **independent microservice** and communicates with other services through an API Gateway.
-
----
-
-# Service Overview
-
-| Property          | Value        |
-| ----------------- | ------------ |
-| Service Name      | auth-service |
-| Port              | 4001         |
-| Database          | PostgreSQL   |
-| Cache             | Redis        |
-| Authentication    | JWT          |
-| Password Security | bcrypt       |
+* Redis caching & rate limiting
+* Queue-based email processing
+* Secure password reset flows
+* Load-tested performance
 
 ---
 
-# Architecture
+# 🧩 Service Overview
+
+| Property          | Value                  |
+| ----------------- | ---------------------- |
+| Service Name      | auth-service           |
+| Port              | 4001                   |
+| Database          | PostgreSQL             |
+| Cache             | Redis                  |
+| Authentication    | JWT (Access + Refresh) |
+| Password Security | bcrypt                 |
+| Async Processing  | Queue + Worker         |
+
+---
+
+# 🏗 Architecture
 
 ```text
 Client
    ↓
-Route
+API Gateway
    ↓
-Rate Limit Middleware (Redis)
+Auth Service
    ↓
-Validation Middleware
-   ↓
-Controller
-   ↓
-Service Layer
-   ↓
-Repository Layer
+-----------------------------------
+| Rate Limit (Redis)              |
+| Validation (Zod)                |
+| Controllers                    |
+| Service Layer                  |
+| Repository Layer               |
+-----------------------------------
    ↓
 PostgreSQL
+
+Async Flow:
+Auth Service → Queue → Worker → Email Service
 ```
 
 ---
 
-# Project Structure
+# 📁 Project Structure
 
 ```text
 auth-service
 │
 ├── src
-│
 │   ├── config
 │   │   ├── db.js
 │   │   └ redis.js
@@ -68,7 +68,8 @@ auth-service
 │   │   └ auth.service.js
 │
 │   ├── repositories
-│   │   └ user.repository.js
+│   │   ├── user.repository.js
+│   │   └ passwordReset.repository.js
 │
 │   ├── routes
 │   │   └ auth.routes.js
@@ -78,26 +79,33 @@ auth-service
 │   │   ├── validate.middleware.js
 │   │   └ rateLimit.middleware.js
 │
-│   ├── validators
-│   │   └ auth.validator.js
+│   ├── queues
+│   │   └ email.queue.js
+│
+│   ├── workers
+│   │   └ email.worker.js
+│
+│   ├── utils
+│   │   ├── token.util.js
+│   │   └ logger.js
 │
 │   └ server.js
 │
+├── load-tests
 ├── Dockerfile
-├── .dockerignore
-├── package.json
+├── docker-compose.yml
+├── .env
 └── README.md
 ```
 
 ---
 
-# Environment Variables
+# ⚙️ Environment Variables
 
-Create a `.env` file.
-
-```
+```env
 PORT=4001
 JWT_SECRET=supersecretkey
+FRONTEND_URL=http://localhost:3000
 
 DB_HOST=postgres
 DB_PORT=5432
@@ -111,353 +119,280 @@ REDIS_PORT=6379
 
 ---
 
-# Database
+# 🗄 Database
 
-Database name:
+### Users Table
 
-```
-creatorpay_auth
-```
-
-Users table schema:
-
-```
+```sql
 CREATE TABLE users (
  id SERIAL PRIMARY KEY,
  email VARCHAR(255) UNIQUE NOT NULL,
  password_hash TEXT NOT NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_users_email ON users(email);
 ```
 
 ---
 
-# Redis Usage
+### Password Reset Table
+
+```sql
+CREATE TABLE password_resets (
+ id SERIAL PRIMARY KEY,
+ user_id INT NOT NULL,
+ token_hash TEXT NOT NULL,
+ expires_at TIMESTAMP NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+# ⚡ Redis Usage
 
 Redis is used for:
 
 * Login rate limiting
-* Security protection
-* Distributed request tracking
-
-Redis service runs inside Docker.
-
----
-
-# API Documentation
+* Refresh token storage
+* User caching
+* Password reset rate limiting
 
 ---
 
-# Health Check
+# 🔐 Authentication Flow
 
-### Endpoint
+```text
+Login →
+  Verify password (bcrypt) →
+  Generate access token (JWT) →
+  Generate refresh token →
+  Store refresh token in Redis
+```
+
+---
+
+# 🔁 Refresh Token Flow
+
+```text
+Client sends refresh token →
+Redis lookup →
+New access token issued
+```
+
+---
+
+# 📬 Password Reset Flow
+
+```text
+Forgot Password →
+Generate token →
+Store hashed token in DB →
+Push email job to queue →
+Worker sends email →
+User resets password
+```
+
+---
+
+# 📡 API Documentation
+
+---
+
+## 🩺 Health Check
 
 ```
 GET /health
 ```
 
-### Response
-
-```
-{
- "service": "auth-service",
- "status": "running"
-}
-```
-
 ---
 
-# Signup
-
-Create a new user.
-
-### Endpoint
+## 📝 Signup
 
 ```
 POST /auth/signup
 ```
 
-### Headers
-
-```
-Content-Type: application/json
-```
-
-### Request Body
-
-```
-{
- "email": "user@test.com",
- "password": "123456"
-}
-```
-
-### Success Response
-
-```
-201 Created
-```
-
-```
-{
- "message": "User created successfully",
- "user": {
-   "id": 1,
-   "email": "user@test.com",
-   "created_at": "2026-03-15T18:26:50.445Z"
- }
-}
-```
-
-### Error Response
-
-Duplicate email:
-
-```
-400 Bad Request
-```
-
-```
-{
- "error": "Email already registered"
-}
-```
-
-Validation error:
-
-```
-{
- "error": "Invalid request data"
-}
-```
-
 ---
 
-# Login
-
-Authenticate user and return JWT token.
-
-### Endpoint
+## 🔑 Login
 
 ```
 POST /auth/login
 ```
 
-### Headers
+### Response
 
-```
-Content-Type: application/json
-```
-
-### Request Body
-
-```
+```json
 {
- "email": "user@test.com",
- "password": "123456"
-}
-```
-
-### Success Response
-
-```
-200 OK
-```
-
-```
-{
- "message": "Login successful",
- "token": "JWT_TOKEN"
-}
-```
-
-### Error Response
-
-```
-401 Unauthorized
-```
-
-```
-{
- "error": "Invalid credentials"
+  "accessToken": "...",
+  "refreshToken": "..."
 }
 ```
 
 ---
 
-# Login Rate Limiting
-
-Login requests are limited using Redis.
-
-### Policy
+## 🔄 Refresh Token
 
 ```
-Max 5 login attempts per minute per IP
-```
-
-If limit exceeded:
-
-```
-429 Too Many Requests
-```
-
-```
-{
- "error": "Too many login attempts. Try again later."
-}
+POST /auth/refresh
 ```
 
 ---
 
-# Protected Endpoint
+## 🚪 Logout
 
-Example authenticated route.
+```
+POST /auth/logout
+```
 
-### Endpoint
+---
+
+## 🔒 Protected Route
 
 ```
 GET /auth/me
 ```
 
-### Headers
+---
+
+## 📧 Forgot Password
 
 ```
-Authorization: Bearer <JWT_TOKEN>
-```
-
-### Response
-
-```
-{
- "message": "Protected route accessed",
- "user": {
-   "userId": 1,
-   "email": "user@test.com"
- }
-}
+POST /auth/forgot-password
 ```
 
 ---
 
-# JWT Authentication
-
-JWT payload structure:
+## 🔁 Reset Password
 
 ```
-{
- userId: number
- email: string
-}
-```
-
-JWT expiration:
-
-```
-1 hour
-```
-
-Example header:
-
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+POST /auth/reset-password
 ```
 
 ---
 
-# Security Features
+# 🛡 Security Features
 
-### Password Hashing
+### ✅ Password Hashing
 
-Passwords are hashed using **bcrypt** before storing.
+* bcrypt with salt rounds
 
-Example:
+### ✅ JWT Authentication
 
-```
-$2b$10$aX9WuczBsFSakTm2yuG8/.iUGUIMalcdxrpu7FWxzwyrB0/Iz6y36
-```
+* Access Token: 15 minutes
+* Refresh Token: 7 days (Redis)
 
----
+### ✅ Rate Limiting
 
-### Request Validation
+* Login: 5 attempts/min per IP
+* Password reset cooldown
 
-Validation implemented using **Zod**.
+### ✅ Token Security
 
-| Field    | Rule                 |
-| -------- | -------------------- |
-| email    | valid email format   |
-| password | minimum 6 characters |
+* Reset tokens stored as **hash**
+* Prevents token leakage
 
----
+### ✅ Silent Failures
 
-### Redis Rate Limiting
-
-Protects login endpoint against:
-
-* brute force attacks
-* credential stuffing
-* bot traffic
+* Prevents user enumeration
 
 ---
 
-# Docker
+# 📬 Email System
 
-Build image:
+* Queue-based (async)
+* Worker processes jobs
+* Retry mechanism (3 attempts)
+* Decoupled architecture
 
-```
+---
+
+# 🐳 Docker
+
+### Build
+
+```bash
 docker build -t creatorpay-auth .
 ```
 
-Run container:
+### Run
 
-```
+```bash
 docker run --network host --env-file .env creatorpay-auth
 ```
 
 ---
 
-# Docker Compose
+# 🐳 Docker Compose
 
-The CreatorPay backend stack runs using Docker Compose.
-
-Services included:
-
-```
-Auth Service
-PostgreSQL
-Redis
-```
-
-Start stack:
-
-```
+```bash
 docker compose up --build
 ```
 
----
+Services:
 
-# Role in CreatorPay Architecture
-
-```
-Client
-   ↓
-API Gateway
-   ↓
-Auth Service
-   ↓
-JWT Token
-   ↓
-Other Microservices
-```
+* Auth Service
+* PostgreSQL
+* Redis
 
 ---
 
-# Planned Improvements
+# 🧪 Load Testing
 
-Future features:
+Using **k6**
 
-* Refresh tokens
+### Signup Test
+
+```bash
+k6 run load-tests/signup-test.js
+```
+
+### Auth Flow Test
+
+```bash
+k6 run load-tests/auth-load-test.js
+```
+
+### Current Performance
+
+* ✅ ~650 req/sec throughput
+* ✅ <200ms avg latency (signup)
+* ⚠️ Login CPU-bound (bcrypt)
+
+---
+
+# 🧠 System Design Highlights
+
+* Microservice architecture
+* Redis-backed scaling
+* Async job processing
+* Stateless authentication
+* Load tested under high concurrency
+
+---
+
+# 🔮 Planned Improvements
+
+* Worker-thread bcrypt (CPU optimization)
+* Dedicated Email Microservice
+* Kafka event-driven architecture
+* OAuth (Google/GitHub)
 * Email verification
-* Password reset
-* OAuth login (Google/GitHub)
-* Centralized logging
-* Auth audit events
+* Distributed logging (ELK)
+
+---
+
+# 🎯 Role in CreatorPay
+
+```text
+Client → API Gateway → Auth Service → JWT → Other Services
+```
+
+---
+
+# 👨‍💻 Author
+
+CreatorPay Backend System
+Distributed Microservices Architecture Project

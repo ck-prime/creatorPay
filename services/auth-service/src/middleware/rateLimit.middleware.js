@@ -1,27 +1,34 @@
 // services/auth-service/src/middleware/rateLimit.middleware.js
-const { client } = require("../config/redis");
+
+const { redis } = require("../config/redis");
 
 exports.loginRateLimiter = async (req, res, next) => {
   try {
-
     const ip = req.ip;
-    const key = `login_attempt:${ip}`;
+    const email = req.body.email || "unknown";
 
-    const attempts = await client.get(key);
+    // 🔥 Better key (IP + email)
+    const key = `login_attempt:${ip}:${email}`;
 
-    if (attempts && attempts >= 5) {
-      return res.status(429).json({
-        error: "Too many login attempts. Try again later."
-      });
+    // 🔥 Atomic increment
+    const attempts = await redis.incr(key);
+
+    // 🔥 Set expiry ONLY on first attempt
+    if (attempts === 1) {
+      await redis.expire(key, 60); // 60 sec window
     }
 
-    await client.incr(key);
-    await client.expire(key, 60);
+    // 🔥 Block if limit exceeded
+    if (attempts > 5) {
+      return res.status(429).json({
+        error: "Too many login attempts. Try again later.",
+      });
+    }
 
     next();
 
   } catch (error) {
-    console.error(error);
-    next();
+    console.error("Rate limiter error:", error);
+    next(); // don't block request on Redis failure
   }
 };

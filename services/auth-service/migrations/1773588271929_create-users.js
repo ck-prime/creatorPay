@@ -14,8 +14,7 @@ export const up = (pgm) => {
 
     email: {
         type: "varchar(255)",
-        notNull: true,
-        unique: true
+        notNull: true
     },
 
     password_hash: {
@@ -28,6 +27,10 @@ export const up = (pgm) => {
         default: pgm.func("current_timestamp")
     }
     });
+    pgm.sql(`
+        CREATE UNIQUE INDEX users_email_unique_idx 
+        ON users (LOWER(email));
+    `);
 };
 
 /**
@@ -36,5 +39,6 @@ export const up = (pgm) => {
  * @returns {Promise<void> | void}
  */
 export const down = (pgm) => {
+    pgm.sql(`DROP INDEX IF EXISTS users_email_unique_idx`);
     pgm.dropTable("users");
 };

@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { generateResetToken } = require("../utils/token.util");
 const { sendMail } = require("../utils/mail.util");
+const { redis } = require("../config/redis");
 
 const { createUser, findUserByEmail, updatePassword } = require("../repositories/user.repository");
 const userRepo = require("../repositories/user.repository");
@@ -19,7 +20,7 @@ exports.signupUser = async (email, password) => {
     throw error;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 6);
 
   const user = await createUser(email, passwordHash);
 
@@ -104,23 +105,34 @@ exports.resetPassword = async (token, newPassword) => {
 };
 
 exports.loginUser = async (email, password) => {
-
-  const user = await findUserByEmail(email);
-
-  if (!user) {
-    const error = new Error("Invalid credentials");
-    error.code = "INVALID_CREDENTIALS";
-    throw error;
+  let user;
+  const cachedUser = await redis.get(`user:${email}`);
+  if (cachedUser) {
+    user = JSON.parse(cachedUser);
+  } else {
+    user = await findUserByEmail(email);
+    if (!user) {
+      const error = new Error("Invalid credentials");
+      error.code = "INVALID_CREDENTIALS";
+      throw error;
+    }
+    await redis.set(
+      `user:${email}`,
+      JSON.stringify({
+        id: user.id,
+        email: user.email,
+        password_hash: user.password_hash
+      }),
+      "EX",
+      300
+    );
   }
-
   const isMatch = await bcrypt.compare(password, user.password_hash);
-
   if (!isMatch) {
     const error = new Error("Invalid credentials");
     error.code = "INVALID_CREDENTIALS";
     throw error;
   }
-
   const accessToken = jwt.sign(
     { userId: user.id, email: user.email },
     process.env.JWT_SECRET,
@@ -128,59 +140,52 @@ exports.loginUser = async (email, password) => {
   );
 
   const refreshToken = crypto.randomBytes(40).toString("hex");
-
-  const redis = require("../config/redis").client;
-
   await redis.set(
     `refresh_token:${refreshToken}`,
     user.id,
-    {
-      EX: 7 * 24 * 60 * 60 // 7 days
-    }
+    "EX",
+    7 * 24 * 60 * 60
   );
-
   return {
     accessToken,
-    refreshToken
+    refreshToken,
   };
-
 };
 
 exports.refreshAccessToken = async (refreshToken) => {
-
-  const redis = require("../config/redis").client;
-
+  const { redis } = require("../config/redis");
   const userId = await redis.get(`refresh_token:${refreshToken}`);
-
   if (!userId) {
     throw new Error("Invalid refresh token");
   }
-
-  const user = await findUserByEmail;
-
   const accessToken = jwt.sign(
     { userId },
     process.env.JWT_SECRET,
     { expiresIn: "15m" }
   );
-
   return accessToken;
-
 };
 
 exports.logoutUser = async (refreshToken) => {
 
-  const redis = require("../config/redis").client;
+  const { redis } = require("../config/redis");
 
   await redis.del(`refresh_token:${refreshToken}`);
 
 };
 
 exports.forgotPassword = async (email) => {
-  try{
-    const user = await userRepo.findUserByEmail(email);
+  try {
+    const { redis } = require("../config/redis");
+    const rateLimitKey = `reset_email:${email}`;
 
-    if (!user) return;
+    const alreadyRequested = await redis.get(rateLimitKey);
+    if (alreadyRequested) {
+      return; 
+    }
+
+    const user = await userRepo.findUserByEmail(email);
+    if (!user) return; 
 
     const { token, tokenHash } = generateResetToken();
 
@@ -195,40 +200,40 @@ exports.forgotPassword = async (email) => {
     const resetLink =
       `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
-    // await sendMail({
-    //   to: email,
-    //   subject: "CreatorPay Password Reset",
-    //   html: `
-    //     <h2>Password Reset Request</h2>
-    //     <p>You requested to reset your password.</p>
-
-    //     <p>
-    //       <a href="${resetLink}">
-    //         Reset Password
-    //       </a>
-    //     </p>
-
-    //     <p>This link will expire in 15 minutes.</p>
-
-    //     <p>If you did not request this, please ignore.</p>
-    //   `
-    // });
-
     const emailQueue = require("../queues/email.queue");
 
-    await emailQueue.add("sendEmail", {
-      to: email,
-      subject: "CreatorPay Password Reset",
-      html: `
-        <h2>Password Reset</h2>
-        <p>Click below to reset password</p>
-        <a href="${resetLink}">${resetLink}</a>
-      `
-    });
-  }catch (error) {
-    logger.error("forgot password failed", error);
-}
+    await emailQueue.add(
+      "sendEmail",
+      {
+        to: email,
+        subject: "CreatorPay Password Reset",
+        html: `
+          <h2>Password Reset Request</h2>
+          <p>You requested to reset your password.</p>
 
-  
+          <p>
+            <a href="${resetLink}">
+              Reset Password
+            </a>
+          </p>
 
+          <p>This link will expire in 15 minutes.</p>
+
+          <p>If you did not request this, please ignore this email.</p>
+        `,
+      },
+      {
+        attempts: 3,     
+        backoff: 5000,       
+        removeOnComplete: true,
+        removeOnFail: false,
+      }
+    );
+    await redis.set(rateLimitKey, "1", "EX", 60); // 1 min cooldown
+
+    return;
+
+  } catch (error) {
+    logger.error("❌ forgot password failed", error);
+  }
 };

@@ -1,23 +1,16 @@
 // services/auth-service/src/config/redis.js
-const { createClient } = require("redis");
 
-const client = createClient({
-  socket: {
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT
-  }
+import Redis from "ioredis";
+
+export const redis = new Redis({
+  host: process.env.REDIS_HOST || "localhost",
+  port: process.env.REDIS_PORT || 6379,
 });
 
-client.on("error", (err) => {
+redis.on("connect", () => {
+  console.log("Connected to Redis");
+});
+
+redis.on("error", (err) => {
   console.error("Redis error:", err);
 });
-
-const connectRedis = async () => {
-  await client.connect();
-  console.log("Connected to Redis");
-};
-
-module.exports = {
-  client,
-  connectRedis
-};
