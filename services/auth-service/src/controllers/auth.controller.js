@@ -127,6 +127,7 @@ exports.login = async (req, res) => {
     }
 
     res.status(500).json({
+      stack: error.stack,
       error: "Internal Server Error"
     });
   }
@@ -141,7 +142,8 @@ exports.refresh = async (req, res) => {
     const accessToken = await refreshAccessToken(refreshToken);
 
     res.json({
-      accessToken
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
     });
 
   } catch (error) {

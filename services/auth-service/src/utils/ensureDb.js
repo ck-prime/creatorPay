@@ -1,3 +1,4 @@
+// services/auth-service/src/utils/ensureDb.js
 const { Client } = require("pg");
 const logger = require("./logger");
 

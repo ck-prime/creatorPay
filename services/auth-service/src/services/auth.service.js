@@ -1,138 +1,99 @@
-// services/auth-service/src/services/auth.service.js
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+
 const { generateResetToken } = require("../utils/token.util");
-const { sendMail } = require("../utils/mail.util");
 const { redis } = require("../config/redis");
 
-const { createUser, findUserByEmail, updatePassword } = require("../repositories/user.repository");
-const userRepo = require("../repositories/user.repository");
+const {
+createUser,
+findUserByEmail,
+updatePassword,
+findUserById,
+} = require("../repositories/user.repository");
+
 const resetRepo = require("../repositories/passwordReset.repository");
 
 exports.signupUser = async (email, password) => {
+const existingUser = await findUserByEmail(email);
 
-  const existingUser = await findUserByEmail(email);
+if (existingUser) {
+const error = new Error("Email already registered");
+error.code = "EMAIL_EXISTS";
+throw error;
+}
 
-  if (existingUser) {
-    const error = new Error("Email already registered");
-    error.code = "EMAIL_EXISTS";
-    throw error;
-  }
+const passwordHash = await bcrypt.hash(password, 6);
 
-  const passwordHash = await bcrypt.hash(password, 6);
+const user = await createUser(email, passwordHash);
 
-  const user = await createUser(email, passwordHash);
-
-  return user;
+return user;
 };
 
-exports.loginUserDepricated = async (email, password) => {
-
-  const user = await findUserByEmail(email);
-
-  if (!user) {
-    const error = new Error("Invalid credentials");
-    error.code = "INVALID_CREDENTIALS";
-    throw error;
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password_hash);
-
-  if (!isMatch) {
-    const error = new Error("Invalid credentials");
-    error.code = "INVALID_CREDENTIALS";
-    throw error;
-  }
-
-  const token = jwt.sign(
-    { userId: user.id, email: user.email },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-
-  return { token };
-};
-
-exports.forgotPasswordDepricated = async (email) => {
-
-  const user = await userRepo.findUserByEmail(email);
-
-  if (!user) {
-    return;
-  }
-
-  const { token, tokenHash } = generateResetToken();
-
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-  await resetRepo.createResetToken(
-    user.id,
-    tokenHash,
-    expiresAt
-  );
-
-  console.log("RESET TOKEN:", token);
-
-};
-
-exports.resetPassword = async (token, newPassword) => {
-
-  const tokenHash = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
-
-  const storedToken = await resetRepo.findToken(tokenHash);
-
-  if (!storedToken) {
-    throw new Error("Invalid token");
-  }
-
-  if (new Date() > storedToken.expires_at) {
-    throw new Error("Token expired");
-  }
-
-  const passwordHash = await bcrypt.hash(newPassword, 10);
-
-  await userRepo.updatePassword(
-    storedToken.user_id,
-    passwordHash
-  );
-
-  await resetRepo.deleteToken(storedToken.id);
-
-};
-
+// ================= LOGIN =================
 exports.loginUser = async (email, password) => {
   let user;
-  const cachedUser = await redis.get(`user:${email}`);
+
+  const normalizedEmail = email.toLowerCase();
+  const cacheKey = `user:${normalizedEmail}`;
+
+  const cachedUser = await redis.get(cacheKey);
+
+  // ================= CACHE HANDLING =================
   if (cachedUser) {
-    user = JSON.parse(cachedUser);
-  } else {
-    user = await findUserByEmail(email);
+    let parsed = null;
+
+    try {
+      parsed = JSON.parse(cachedUser);
+    } catch (err) {
+      console.error("❌ Invalid cache JSON, clearing...");
+      await redis.del(cacheKey);
+    }
+
+    if (parsed && parsed.email) {
+      user = await findUserByEmail(parsed.email);
+    }
+  }
+
+  // ================= DB FALLBACK =================
+  if (!user) {
+    user = await findUserByEmail(normalizedEmail);
+
     if (!user) {
       const error = new Error("Invalid credentials");
       error.code = "INVALID_CREDENTIALS";
       throw error;
     }
+
+    // ✅ Cache only safe data
     await redis.set(
-      `user:${email}`,
+      cacheKey,
       JSON.stringify({
         id: user.id,
-        email: user.email,
-        password_hash: user.password_hash
+        email: user.email
       }),
       "EX",
       300
     );
   }
+
+  // ================= SAFETY CHECK =================
+  if (!user || !user.password_hash) {
+    const error = new Error("Invalid credentials");
+    error.code = "INVALID_CREDENTIALS";
+    throw error;
+  }
+
+  // ================= PASSWORD VERIFY =================
   const isMatch = await bcrypt.compare(password, user.password_hash);
+
   if (!isMatch) {
     const error = new Error("Invalid credentials");
     error.code = "INVALID_CREDENTIALS";
     throw error;
   }
+
+  // ================= TOKEN GENERATION =================
   const accessToken = jwt.sign(
     { userId: user.id, email: user.email },
     process.env.JWT_SECRET,
@@ -140,100 +101,148 @@ exports.loginUser = async (email, password) => {
   );
 
   const refreshToken = crypto.randomBytes(40).toString("hex");
+
   await redis.set(
     `refresh_token:${refreshToken}`,
     user.id,
     "EX",
     7 * 24 * 60 * 60
   );
+
   return {
     accessToken,
-    refreshToken,
+    refreshToken
   };
 };
 
-exports.refreshAccessToken = async (refreshToken) => {
-  const { redis } = require("../config/redis");
-  const userId = await redis.get(`refresh_token:${refreshToken}`);
+// ================= REFRESH =================
+exports.refreshAccessTokenDepricated = async (refreshToken) => {
+const userId = await redis.get(`refresh_token:${refreshToken}`);
+
+if (!userId) {
+throw new Error("Invalid refresh token");
+}
+
+const accessToken = jwt.sign(
+{ userId },
+process.env.JWT_SECRET,
+{ expiresIn: "15m" }
+);
+
+return accessToken;
+};
+
+exports.refreshAccessToken = async (oldRefreshToken) => {
+
+  // 1️⃣ Check old token
+  const userId = await redis.get(`refresh_token:${oldRefreshToken}`);
+
   if (!userId) {
     throw new Error("Invalid refresh token");
   }
+
+  // 2️⃣ 🔥 DELETE OLD TOKEN (rotation step)
+  await redis.del(`refresh_token:${oldRefreshToken}`);
+
+  // 3️⃣ Generate NEW tokens
   const accessToken = jwt.sign(
     { userId },
     process.env.JWT_SECRET,
     { expiresIn: "15m" }
   );
-  return accessToken;
+
+  const newRefreshToken = require("crypto")
+    .randomBytes(40)
+    .toString("hex");
+
+  // 4️⃣ Store NEW refresh token
+  await redis.set(
+    `refresh_token:${newRefreshToken}`,
+    userId,
+    "EX",
+    7 * 24 * 60 * 60
+  );
+
+  // 5️⃣ Return BOTH tokens
+  return {
+    accessToken,
+    refreshToken: newRefreshToken
+  };
 };
 
+// ================= LOGOUT =================
 exports.logoutUser = async (refreshToken) => {
-
-  const { redis } = require("../config/redis");
-
-  await redis.del(`refresh_token:${refreshToken}`);
-
+await redis.del(`refresh_token:${refreshToken}`);
 };
 
+// ================= FORGOT PASSWORD =================
 exports.forgotPassword = async (email) => {
-  try {
-    const { redis } = require("../config/redis");
-    const rateLimitKey = `reset_email:${email}`;
+const rateLimitKey = `reset_email:${email.toLowerCase()}`;
 
-    const alreadyRequested = await redis.get(rateLimitKey);
-    if (alreadyRequested) {
-      return; 
-    }
+const alreadyRequested = await redis.get(rateLimitKey);
+if (alreadyRequested) return;
 
-    const user = await userRepo.findUserByEmail(email);
-    if (!user) return; 
+const user = await findUserByEmail(email.toLowerCase());
+if (!user) return;
 
-    const { token, tokenHash } = generateResetToken();
+const { token, tokenHash } = generateResetToken();
 
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    await resetRepo.createResetToken(
-      user.id,
-      tokenHash,
-      expiresAt
-    );
+await resetRepo.createResetToken(
+user.id,
+tokenHash,
+expiresAt
+);
 
-    const resetLink =
-      `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+const emailQueue = require("../queues/email.queue");
 
-    const emailQueue = require("../queues/email.queue");
+await emailQueue.add("sendEmail", {
+  to: user.email,
+  subject: "Reset Password",
+  html: `<h1>Your reset token: ${token}</h1>`
+});
 
-    await emailQueue.add(
-      "sendEmail",
-      {
-        to: email,
-        subject: "CreatorPay Password Reset",
-        html: `
-          <h2>Password Reset Request</h2>
-          <p>You requested to reset your password.</p>
+await redis.set(rateLimitKey, "1", "EX", 60);
+};
 
-          <p>
-            <a href="${resetLink}">
-              Reset Password
-            </a>
-          </p>
+// ================= RESET PASSWORD =================
+exports.resetPassword = async (token, newPassword) => {
 
-          <p>This link will expire in 15 minutes.</p>
+const tokenHash = crypto
+.createHash("sha256")
+.update(token)
+.digest("hex");
 
-          <p>If you did not request this, please ignore this email.</p>
-        `,
-      },
-      {
-        attempts: 3,     
-        backoff: 5000,       
-        removeOnComplete: true,
-        removeOnFail: false,
-      }
-    );
-    await redis.set(rateLimitKey, "1", "EX", 60); // 1 min cooldown
+const storedToken = await resetRepo.findToken(tokenHash);
 
-    return;
+if (!storedToken) {
+throw new Error("Invalid token");
+}
 
-  } catch (error) {
-    logger.error("❌ forgot password failed", error);
-  }
+if (new Date() > storedToken.expires_at) {
+throw new Error("Token expired");
+}
+
+const passwordHash = await bcrypt.hash(newPassword, 10);
+
+// ✅ Update password
+await updatePassword(
+storedToken.user_id,
+passwordHash
+);
+
+// ✅ Delete token
+await resetRepo.deleteToken(storedToken.id);
+
+// 🔥 CRITICAL: invalidate cache
+const user = await findUserById(storedToken.user_id);
+
+if (user) {
+await redis.del(`user:${user.email.toLowerCase()}`);
+}
+
+// 🔥 OPTIONAL (VERY IMPORTANT FOR SECURITY)
+// invalidate all sessions
+// (you can extend this later with user-session tracking)
 };

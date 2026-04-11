@@ -18,13 +18,12 @@ exports.createUser = async (email, passwordHash) => {
 
 
 exports.findUserByEmail = async (email) => {
-
   const query = `
-    SELECT * FROM users WHERE email = $1
+    SELECT * FROM users 
+    WHERE LOWER(email) = LOWER($1)
   `;
 
   const result = await pool.query(query, [email]);
-
   return result.rows[0];
 };
 
@@ -40,5 +39,11 @@ exports.updatePassword = async (userId, passwordHash) => {
 
   const result = await pool.query(query, [passwordHash, userId]);
 
+  return result.rows[0];
+};
+
+exports.findUserById = async (id) => {
+  const query = `SELECT * FROM users WHERE id = $1`;
+  const result = await pool.query(query, [id]);
   return result.rows[0];
 };
