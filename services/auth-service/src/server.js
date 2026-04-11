@@ -1,3 +1,4 @@
+// services/auth-service/src/server.js
 require("dotenv").config();
 require("./workers/email.worker");
 

@@ -1,21 +1,20 @@
 # 🚀 CreatorPay — Distributed Creator Economy Platform
 
-A **production-grade distributed system** simulating a modern creator economy platform.
+A **production-grade distributed backend system** simulating a modern creator economy platform.
 
-CreatorPay models real-world systems used by platforms like monetization apps, live-streaming services, and creator tools — focusing on **scalability, reliability, and performance under load**.
+CreatorPay focuses on **real-world backend engineering**, including authentication, API gateways, async processing, and scalable system design.
 
 ---
 
 # 🌍 Overview
 
-CreatorPay enables users to:
+CreatorPay enables:
 
-* 👍 Like posts at massive scale (**100k+ likes/min simulation**)
-* 💸 Tip creators and manage balances
-* 🔐 Authenticate securely (JWT + Redis + rate limiting)
-* 📬 Handle async workflows (email, notifications)
-* ⚡ Process high-throughput events using Kafka
-* 💰 Manage wallets using **double-entry accounting**
+* 🔐 Secure authentication (JWT + Redis)
+* 📬 Async workflows (email via queue + worker)
+* 🚦 API Gateway routing & validation
+* ⚡ High-performance backend architecture
+* 🧠 Real-world microservices evolution
 
 ---
 
@@ -23,56 +22,59 @@ CreatorPay enables users to:
 
 * Horizontal scalability
 * Fault tolerance
-* Event-driven architecture
-* High concurrency handling
-* Idempotent operations
-* Low-latency responses under load
+* Service isolation
+* Clean API routing (Gateway)
+* Async processing
+* Production-like architecture
 
 ---
 
-# 🏗 Architecture
+# 🏗 Current Architecture (Phase 4)
 
 ```text
 Client
    ↓
-API Gateway (Nginx)
+API Gateway (Node.js)
    ↓
--------------------------------------------------------
-| Auth | User | Content | Like | Payment | Wallet |
--------------------------------------------------------
-                           ↓
-                         Kafka
-                           ↓
--------------------------------------------------------
-| Ledger | Notification | Analytics | Fraud Detection |
--------------------------------------------------------
+---------------------
+|   Auth Service    |
+---------------------
+       ↓
+   Redis + PostgreSQL
+       ↓
+ Email Queue + Worker
 ```
 
 ---
 
-# ⚙️ Core Concepts
+# ⚙️ Core Concepts Implemented
 
-### 🔹 Microservices
+### 🔹 API Gateway
 
-Each service is independently deployable and scalable.
+* Central entry point
+* Request routing
+* JWT validation
+* Rate limiting
 
-### 🔹 Event-Driven Architecture
+### 🔹 Authentication System
 
-Services communicate using **Kafka events**.
+* JWT access + refresh tokens
+* Secure password hashing (bcrypt)
+* Refresh token rotation
+* Redis session storage
 
 ### 🔹 Async Processing
 
-Heavy tasks handled via:
+* Email queue using BullMQ
+* Background worker processing
 
-* queues
-* workers
-* background jobs
+### 🔹 Caching
 
-### 🔹 Distributed Systems
+* Redis used for:
 
-* Redis caching
-* distributed locks
-* idempotency handling
+  * login optimization
+  * rate limiting
+  * token storage
 
 ---
 
@@ -81,215 +83,127 @@ Heavy tasks handled via:
 ## Backend
 
 * Node.js
+* Express
 * PostgreSQL
 * Redis
+* BullMQ (queue system)
+
+## Infrastructure (Current)
+
+* Docker (planned usage)
+* API Gateway (Node.js)
+
+## Planned
+
 * Kafka
-* Docker
-
-## Frontend
-
-* Next.js
-* React
-* TypeScript
-* TailwindCSS
-* React Query
-
-## Mobile
-
-* React Native
-* Expo
-
-## Infrastructure
-
-* Docker Compose
-* Nginx (API Gateway)
-* Prometheus + Grafana (planned)
-* ELK Stack (planned)
-
----
-
-# 🐳 Setup Guide
-
-## 📌 System Requirements
-
-```text
-Ubuntu 22.04+
-Node.js 20+
-Docker 29+
-8GB RAM recommended
-```
-
----
-
-## 🔧 Install Node.js
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
----
-
-## 📦 Install pnpm
-
-```bash
-sudo npm install -g pnpm
-```
-
----
-
-## 🐳 Install Docker
-
-```bash
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
-
----
-
-## ✅ Verify Docker
-
-```bash
-docker --version
-docker compose version
-```
-
----
-
-## 🔓 Run Docker without sudo
-
-```bash
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
----
-
-# ⚡ Kafka Setup
-
-```bash
-mkdir kafka && cd kafka
-```
-
-### docker-compose.yml
-
-```yaml
-version: '3'
-
-services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-```
-
----
-
-## ▶️ Start Kafka
-
-```bash
-docker compose up -d
-```
-
----
-
-## 📊 Verify
-
-```bash
-docker ps
-```
+* Nginx
+* Monitoring stack
 
 ---
 
 # 🚀 Running the Project
 
-## Start full system
+## Start Auth Service
 
 ```bash
-docker compose down --remove-orphans
-docker compose up --build
+cd services/auth-service
+npm install
+npm run dev
 ```
 
 ---
 
-## Stop system
+## Start Gateway
 
 ```bash
-docker compose down
+cd gateway
+npm install
+npm run dev
 ```
 
 ---
 
-## View logs
+## Start Worker (IMPORTANT)
 
 ```bash
-docker logs -f <container_name>
+node src/workers/email.worker.js
 ```
 
 ---
 
-# 📈 What’s Implemented (Current State)
+# 📈 Current Implementation Status
 
-## ✅ Authentication Service (Completed)
+## ✅ Phase 1 — Planning
 
-* Signup / Login
-* JWT access + refresh tokens
-* Redis-based rate limiting
-* Password hashing (bcrypt)
-* Password reset (secure token hashing)
-* Async email queue (worker-based)
-* Load tested (~650 req/sec)
+✔ System design
+✔ Architecture defined
+
+## ✅ Phase 2 — Infrastructure
+
+✔ PostgreSQL
+✔ Redis
+
+## ✅ Phase 3 — Auth Service
+
+✔ Signup / Login
+✔ JWT + Refresh tokens
+✔ Rate limiting
+✔ Password reset
+✔ Email queue + worker
+
+## ✅ Phase 4 — API Gateway
+
+✔ Request proxying
+✔ Path handling (fixed)
+✔ JWT validation
+✔ Rate limiting
 
 ---
 
-## 🔥 Load Testing Results
+# 🔥 Load Testing (Auth Service)
 
 * ~650 requests/sec handled
 * ~170ms avg latency
-* ~592ms p95 latency
-* Bottleneck: bcrypt (CPU bound)
+* Bottleneck: bcrypt (CPU-bound)
 
 ---
 
-# 🗺 Development Roadmap
+# 🗺 Updated Roadmap
 
-## ~~Phase 1 — Planning~~
+## ✅ Phase 1 — Planning
 
-~~System design, schemas, Kafka topics~~
+~~System design~~
 
-## ~~Phase 2 — Infrastructure~~
+## ✅ Phase 2 — Infrastructure
 
-~~Docker, Redis, PostgreSQL, Kafka~~
+~~Redis + PostgreSQL~~
 
-## ~~Phase 3 — Auth Service~~ ✅ COMPLETED
+## ✅ Phase 3 — Auth Service
 
-* Signup/Login
-* JWT + Refresh tokens
-* Rate limiting
-* Password reset (email queue)
+~~Auth + Email Queue~~
 
----
+## ✅ Phase 4 — API Gateway
 
-## 🚧 Phase 4 — User & Content
-
-* User profiles
-* Creator posts
-* Media uploads
+~~Routing + JWT + Rate limiting~~
 
 ---
 
-## 🚧 Phase 5 — Like System (High Scale)
+## 🚧 Phase 5 — User Service (NEXT)
+
+* User profile system
+* DB schema design
+* Gateway integration
+
+---
+
+## 🚧 Phase 6 — Content Service
+
+* Posts & media
+* storage strategy
+
+---
+
+## 🚧 Phase 7 — Like System (High Scale)
 
 * Redis counters
 * Kafka events
@@ -297,52 +211,24 @@ docker logs -f <container_name>
 
 ---
 
-## 🚧 Phase 6 — Wallet & Ledger
+## 🚧 Phase 8 — Wallet & Ledger
 
-* Wallet service
 * double-entry accounting
+* transaction safety
 
 ---
 
-## 🚧 Phase 7 — Payments
+## 🚧 Phase 9 — Payments
 
-* Stripe + Razorpay
-* webhooks
-* idempotency
-
----
-
-## 🚧 Phase 8 — Concurrency
-
-* distributed locks
-* race condition handling
+* Stripe / Razorpay
+* webhook handling
 
 ---
 
-## 🚧 Phase 9 — Frontend
+## 🚧 Phase 10 — Event-Driven Architecture
 
-* Next.js app
-* real-time UI
-
----
-
-## 🚧 Phase 10 — Mobile
-
-* React Native app
-
----
-
-## 🚧 Phase 11 — Load Testing
-
-* 100k+ events simulation
-
----
-
-## 🚧 Phase 12 — Production
-
-* CI/CD
-* monitoring
-* cloud deployment
+* Kafka integration
+* decoupled services
 
 ---
 
@@ -350,10 +236,9 @@ docker logs -f <container_name>
 
 * Stateless authentication
 * Redis-backed scaling
-* Event-driven microservices
+* API Gateway pattern
 * Async job processing
-* High concurrency handling
-* Production-like architecture
+* Microservice-ready architecture
 
 ---
 
@@ -362,11 +247,11 @@ docker logs -f <container_name>
 To demonstrate:
 
 ```text
-Real-world backend engineering skills
+Real-world backend engineering
 +
-Distributed systems design
+Microservices architecture
 +
-High-scale architecture thinking
+Scalable system design
 ```
 
 ---
