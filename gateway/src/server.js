@@ -7,6 +7,7 @@ const morgan = require("morgan");
 const { limiter } = require("./middleware/rateLimit.middleware");
 const { authenticate } = require("./middleware/auth.middleware");
 const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(authenticate);
 
 // 🔹 Routes
 app.use("/auth", authRoutes);
+app.use("/user", userRoutes);
 
 // 🔹 Body parser (keep after proxy safety)
 app.use(express.json());

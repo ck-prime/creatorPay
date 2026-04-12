@@ -14,20 +14,34 @@ findUserById,
 
 const resetRepo = require("../repositories/passwordReset.repository");
 
+const axios = require("axios");
+
 exports.signupUser = async (email, password) => {
-const existingUser = await findUserByEmail(email);
+  const existingUser = await findUserByEmail(email);
 
-if (existingUser) {
-const error = new Error("Email already registered");
-error.code = "EMAIL_EXISTS";
-throw error;
-}
+  if (existingUser) {
+    const error = new Error("Email already registered");
+    error.code = "EMAIL_EXISTS";
+    throw error;
+  }
 
-const passwordHash = await bcrypt.hash(password, 6);
+  const passwordHash = await bcrypt.hash(password, 6);
 
-const user = await createUser(email, passwordHash);
+  const user = await createUser(email, passwordHash);
 
-return user;
+  try {
+    await axios.post("http://localhost:4002/user", {
+      id: user.id,
+      email: user.email,
+    });
+
+    console.log("✅ User synced with User Service");
+
+  } catch (err) {
+    console.error("❌ User service sync failed:", err.message);
+  }
+
+  return user;
 };
 
 // ================= LOGIN =================

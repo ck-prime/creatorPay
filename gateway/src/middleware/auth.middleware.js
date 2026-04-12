@@ -11,8 +11,7 @@ const publicRoutes = [
 
 exports.authenticate = (req, res, next) => {
   try {
-    // ✅ allow public routes
-    if (publicRoutes.includes(req.originalUrl)) {
+    if (publicRoutes.some(route => req.originalUrl.startsWith(route))) {
       return next();
     }
 
@@ -33,8 +32,10 @@ exports.authenticate = (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
+    console.log("✅ DECODED:", decoded);
     req.user = decoded;
+    delete req.headers["x-user-id"];
+    req.headers["x-user-id"] = String(decoded.userId);
 
     next();
 
