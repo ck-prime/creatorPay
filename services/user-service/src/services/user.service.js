@@ -1,6 +1,7 @@
 // services/user-service/src/services/user.service.js
 const pool = require("../config/db");
 const { findUserById } = require("../repositories/user.repository");
+const { getUsersByIds } = require("../repositories/user.repository");
 
 exports.getUserProfile = async (userId) => {
   const user = await findUserById(userId);
@@ -46,4 +47,12 @@ exports.createUserProfile = async (id, email) => {
   const result = await pool.query(query, [id, email, username]);
 
   return result.rows[0];
+};
+
+exports.getUsersByIds = async (userIds) => {
+  if (!userIds || userIds.length === 0) return [];
+
+  const users = await getUsersByIds(userIds);
+
+  return users;
 };

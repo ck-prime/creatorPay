@@ -1,6 +1,7 @@
 // services/user-service/src/controllers/user.controller.js
 const { getUserProfile } = require("../services/user.service");
 const { createUserProfile } = require("../services/user.service");
+const { getUsersByIds } = require("../services/user.service");
 
 exports.getMe = async (req, res) => {
   try {
@@ -40,5 +41,21 @@ exports.createUser = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+exports.getUsersBulk = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({ error: "userIds must be an array" });
+    }
+
+    const users = await getUsersByIds(userIds);
+
+    res.json(users);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };

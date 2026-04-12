@@ -6,3 +6,15 @@ exports.findUserById = async (id) => {
   const result = await pool.query(query, [id]);
   return result.rows[0];
 };
+
+exports.getUsersByIds = async (userIds) => {
+  const query = `
+    SELECT id, username, display_name, profile_picture
+    FROM users
+    WHERE id = ANY($1)
+  `;
+
+  const result = await pool.query(query, [userIds]);
+
+  return result.rows;
+};

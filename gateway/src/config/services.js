@@ -3,4 +3,5 @@
 module.exports = {
   AUTH_SERVICE: "http://localhost:4001",
   USER_SERVICE: "http://localhost:4002",
+  GRAPH_SERVICE: "http://localhost:4003",
 };

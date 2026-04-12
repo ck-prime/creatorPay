@@ -2,7 +2,7 @@
 
 A **production-grade distributed backend system** simulating a modern creator economy platform.
 
-CreatorPay focuses on **real-world backend engineering**, including authentication, API gateways, async processing, and scalable system design.
+CreatorPay focuses on **real-world backend engineering**, including microservices, API gateways, distributed data management, caching, and scalable system design.
 
 ---
 
@@ -11,6 +11,8 @@ CreatorPay focuses on **real-world backend engineering**, including authenticati
 CreatorPay enables:
 
 * 🔐 Secure authentication (JWT + Redis)
+* 👤 User profile management
+* 👥 Social graph (follow/unfollow system)
 * 📬 Async workflows (email via queue + worker)
 * 🚦 API Gateway routing & validation
 * ⚡ High-performance backend architecture
@@ -22,27 +24,30 @@ CreatorPay enables:
 
 * Horizontal scalability
 * Fault tolerance
-* Service isolation
+* Service isolation (true microservices)
 * Clean API routing (Gateway)
 * Async processing
+* Low-latency reads via caching
 * Production-like architecture
 
 ---
 
-# 🏗 Current Architecture (Phase 4)
+# 🏗 Current Architecture (Phase 6)
 
 ```text
 Client
    ↓
 API Gateway (Node.js)
    ↓
----------------------
-|   Auth Service    |
----------------------
-       ↓
-   Redis + PostgreSQL
-       ↓
- Email Queue + Worker
+-------------------------------------------------
+| Auth | User | Social Graph | (Post - upcoming) |
+-------------------------------------------------
+   ↓        ↓         ↓
+Redis   PostgreSQL   PostgreSQL
+           ↓              ↓
+        User Data     Follow Graph
+                         ↓
+                      Redis Cache
 ```
 
 ---
@@ -52,9 +57,12 @@ API Gateway (Node.js)
 ### 🔹 API Gateway
 
 * Central entry point
-* Request routing
+* Request routing (multi-service)
 * JWT validation
 * Rate limiting
+* Header-based identity injection (`x-user-id`)
+
+---
 
 ### 🔹 Authentication System
 
@@ -63,18 +71,39 @@ API Gateway (Node.js)
 * Refresh token rotation
 * Redis session storage
 
+---
+
+### 🔹 User Service
+
+* User profile creation
+* Username generation
+* Profile retrieval
+* Bulk user fetch (for service-to-service communication)
+
+---
+
+### 🔹 Social Graph Service
+
+* Follow / Unfollow system
+* Followers / Following APIs (paginated)
+* Mutual followers
+* Follow suggestions (graph-based)
+
+---
+
+### 🔹 Caching Layer (Redis)
+
+* User profile caching (social graph enrichment)
+* Bulk cache reads using `mget`
+* Pipeline writes for performance
+* Cache-aside pattern
+
+---
+
 ### 🔹 Async Processing
 
 * Email queue using BullMQ
 * Background worker processing
-
-### 🔹 Caching
-
-* Redis used for:
-
-  * login optimization
-  * rate limiting
-  * token storage
 
 ---
 
@@ -85,17 +114,31 @@ API Gateway (Node.js)
 * Node.js
 * Express
 * PostgreSQL
-* Redis
-* BullMQ (queue system)
+* Redis (ioredis)
+* BullMQ
+
+---
+
+## Architecture
+
+* Microservices (service isolation)
+* API Gateway pattern
+* Service-to-service communication (HTTP)
+* Cache-aside pattern
+
+---
 
 ## Infrastructure (Current)
 
 * Docker (planned usage)
 * API Gateway (Node.js)
 
+---
+
 ## Planned
 
-* Kafka
+* Kafka (event-driven system)
+* Feed service (fanout system)
 * Nginx
 * Monitoring stack
 
@@ -107,6 +150,26 @@ API Gateway (Node.js)
 
 ```bash
 cd services/auth-service
+npm install
+npm run dev
+```
+
+---
+
+## Start User Service
+
+```bash
+cd services/user-service
+npm install
+npm run dev
+```
+
+---
+
+## Start Social Graph Service
+
+```bash
+cd services/social-graph-service
 npm install
 npm run dev
 ```
@@ -138,10 +201,14 @@ node src/workers/email.worker.js
 ✔ System design
 ✔ Architecture defined
 
+---
+
 ## ✅ Phase 2 — Infrastructure
 
 ✔ PostgreSQL
 ✔ Redis
+
+---
 
 ## ✅ Phase 3 — Auth Service
 
@@ -151,12 +218,34 @@ node src/workers/email.worker.js
 ✔ Password reset
 ✔ Email queue + worker
 
+---
+
 ## ✅ Phase 4 — API Gateway
 
 ✔ Request proxying
-✔ Path handling (fixed)
 ✔ JWT validation
 ✔ Rate limiting
+✔ Secure header injection
+
+---
+
+## ✅ Phase 5 — User Service
+
+✔ User profile system
+✔ Username generation
+✔ Bulk user APIs
+
+---
+
+## ✅ Phase 6 — Social Graph Service
+
+✔ Follow / Unfollow
+✔ Followers / Following APIs
+✔ Pagination
+✔ Mutual followers
+✔ Follow suggestions
+✔ Redis caching (optimized)
+✔ Service-to-service enrichment
 
 ---
 
@@ -174,13 +263,19 @@ node src/workers/email.worker.js
 
 ~~System design~~
 
+---
+
 ## ✅ Phase 2 — Infrastructure
 
 ~~Redis + PostgreSQL~~
 
+---
+
 ## ✅ Phase 3 — Auth Service
 
 ~~Auth + Email Queue~~
+
+---
 
 ## ✅ Phase 4 — API Gateway
 
@@ -188,22 +283,35 @@ node src/workers/email.worker.js
 
 ---
 
-## 🚧 Phase 5 — User Service (NEXT)
+## ✅ Phase 5 — User Service
 
-* User profile system
-* DB schema design
-* Gateway integration
+~~User profiles~~
 
 ---
 
-## 🚧 Phase 6 — Content Service
+## ✅ Phase 6 — Social Graph
+
+~~Follow system + suggestions~~
+
+---
+
+## 🚧 Phase 7 — Feed System (NEXT BIG STEP)
+
+* Feed service (new microservice)
+* Fanout-on-write model
+* Timeline generation
+* Redis feed caching
+
+---
+
+## 🚧 Phase 8 — Content Service
 
 * Posts & media
 * storage strategy
 
 ---
 
-## 🚧 Phase 7 — Like System (High Scale)
+## 🚧 Phase 9 — Like System (High Scale)
 
 * Redis counters
 * Kafka events
@@ -211,21 +319,21 @@ node src/workers/email.worker.js
 
 ---
 
-## 🚧 Phase 8 — Wallet & Ledger
+## 🚧 Phase 10 — Wallet & Ledger
 
 * double-entry accounting
 * transaction safety
 
 ---
 
-## 🚧 Phase 9 — Payments
+## 🚧 Phase 11 — Payments
 
 * Stripe / Razorpay
 * webhook handling
 
 ---
 
-## 🚧 Phase 10 — Event-Driven Architecture
+## 🚧 Phase 12 — Event-Driven Architecture
 
 * Kafka integration
 * decoupled services
@@ -235,10 +343,12 @@ node src/workers/email.worker.js
 # 🧠 System Design Highlights
 
 * Stateless authentication
-* Redis-backed scaling
+* Redis-backed caching layer
 * API Gateway pattern
-* Async job processing
-* Microservice-ready architecture
+* Microservice separation (auth, user, graph)
+* Service-to-service communication
+* Optimized read-heavy systems
+* Cache-aside strategy
 
 ---
 
@@ -252,6 +362,8 @@ Real-world backend engineering
 Microservices architecture
 +
 Scalable system design
++
+Production-level thinking
 ```
 
 ---
