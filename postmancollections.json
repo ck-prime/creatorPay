@@ -1,204 +1,500 @@
 {
-"info": {
-"name": "CreatorPay Gateway APIs",
-"_postman_id": "creatorpay-gateway",
-"description": "Full system APIs (Gateway + Auth + User Service)\n\nFlow:\n1. Signup → creates user in Auth + User Service\n2. Login → get tokens\n3. Use accessToken for protected routes\n4. Refresh → rotate tokens\n5. Logout → invalidate session",
-"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-},
-"variable": [
-{ "key": "baseUrl", "value": "http://localhost:3000" },
-{ "key": "accessToken", "value": "" },
-{ "key": "refreshToken", "value": "" }
-],
-"item": [
-
-```
-{
-  "name": "🏥 HEALTH CHECKS",
-  "description": "Verify all services are running",
-  "item": [
-    {
-      "name": "Gateway Health",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}"
-      }
-    },
-    {
-      "name": "Auth Service Health",
-      "request": {
-        "method": "GET",
-        "url": "http://localhost:4001/health"
-      }
-    },
-    {
-      "name": "User Service Health",
-      "request": {
-        "method": "GET",
-        "url": "http://localhost:4002/health"
-      }
-    }
-  ]
-},
-
-{
-  "name": "🔐 AUTH",
-  "description": "Authentication & session management",
-  "item": [
-
-    {
-      "name": "Signup",
-      "request": {
-        "method": "POST",
-        "description": "Creates a new user in Auth Service and syncs profile in User Service",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"user@yopmail.com\",\n  \"password\": \"123456\"\n}"
-        },
-        "url": "{{baseUrl}}/auth/signup"
-      }
-    },
-
-    {
-      "name": "Login",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "let json = pm.response.json();",
-              "pm.collectionVariables.set(\"accessToken\", json.accessToken);",
-              "pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
-              "console.log(\"Tokens saved\");"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "description": "Authenticate user and receive access + refresh tokens",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"user@yopmail.com\",\n  \"password\": \"123456\"\n}"
-        },
-        "url": "{{baseUrl}}/auth/login"
-      }
-    },
-
-    {
-      "name": "Refresh Token",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "let json = pm.response.json();",
-              "pm.collectionVariables.set(\"accessToken\", json.accessToken);",
-              "pm.collectionVariables.set(\"refreshToken\", json.refreshToken);"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "description": "Generate new access token using refresh token (token rotation supported)",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-        },
-        "url": "{{baseUrl}}/auth/refresh"
-      }
-    },
-
-    {
-      "name": "Logout",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.collectionVariables.set(\"accessToken\", \"\");",
-              "pm.collectionVariables.set(\"refreshToken\", \"\");"
-            ]
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "description": "Invalidate refresh token and logout user",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-        },
-        "url": "{{baseUrl}}/auth/logout"
-      }
-    },
-
-    {
-      "name": "Forgot Password",
-      "request": {
-        "method": "POST",
-        "description": "Send password reset email (rate limited)",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"user@yopmail.com\"\n}"
-        },
-        "url": "{{baseUrl}}/auth/forgot-password"
-      }
-    },
-
-    {
-      "name": "Reset Password",
-      "request": {
-        "method": "POST",
-        "description": "Reset password using token received via email",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"token\": \"RESET_TOKEN\",\n  \"newPassword\": \"newpassword123\"\n}"
-        },
-        "url": "{{baseUrl}}/auth/reset-password"
-      }
-    }
-  ]
-},
-
-{
-  "name": "👤 USER SERVICE",
-  "description": "User profile APIs",
-  "item": [
-    {
-      "name": "Get My Profile",
-      "request": {
-        "method": "GET",
-        "description": "Fetch logged-in user profile using JWT (via gateway header forwarding)",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
-        ],
-        "url": "{{baseUrl}}/user/me"
-      }
-    }
-  ]
-}
-```
-
-]
+	"info": {
+		"_postman_id": "838d5bc3-c285-4ab3-910e-ed6f097989d3",
+		"name": "CreatorPay Auth Service",
+		"description": "Auth service API collection with token automation",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39501396"
+	},
+	"item": [
+		{
+			"name": "Signup",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"user@yopmail.com\",\n  \"password\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/signup",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"signup"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let json = pm.response.json();",
+							"",
+							"pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+							"pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+							"",
+							"console.log(\"Access Token saved\");",
+							"console.log(\"Refresh Token saved\");"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"user@yopmail.com\",\n  \"password\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/login",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Protected Route (/me)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/auth/me",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Refresh Access Token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let json = pm.response.json();",
+							"",
+							"pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+							"",
+							"console.log(\"New Access Token Saved\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/refresh",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"refresh"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Logout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.collectionVariables.set(\"accessToken\", \"\");",
+							"pm.collectionVariables.set(\"refreshToken\", \"\");",
+							"",
+							"console.log(\"Tokens cleared after logout\");"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Brerer {{accessToken}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/logout",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"logout"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Forgot Password",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"user@yopmail.com\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/forgot-password",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"forgot-password"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reset Password",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"token\": \"RESET_TOKEN\",\n  \"newPassword\": \"newpassword123\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/reset-password",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth",
+						"reset-password"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "user.me",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoidXNlckB5b3BtYWlsLmNvbSIsImlhdCI6MTc3NTkzNzg4NywiZXhwIjoxNzc1OTM4Nzg3fQ.Ef4m-bhSJT3ugt1kazA33D3zlgZC_n8_KzOIGxnP5qg"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/user/me",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"user",
+						"me"
+					]
+				},
+				"description": "Generated from cURL: curl --location 'http://localhost:3000/auth/me' \\\n--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoidXNlckB5b3BtYWlsLmNvbSIsImlhdCI6MTc3NTkzNzg4NywiZXhwIjoxNzc1OTM4Nzg3fQ.Ef4m-bhSJT3ugt1kazA33D3zlgZC_n8_KzOIGxnP5qg'"
+			},
+			"response": []
+		},
+		{
+			"name": "follow",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/social/follow/1",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"social",
+						"follow",
+						"1"
+					]
+				},
+				"description": "Generated from cURL: curl -X POST http://localhost:3000/social/follow/2 \\\n  -H \"Authorization: Bearer <TOKEN>\""
+			},
+			"response": []
+		},
+		{
+			"name": "unfollow",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/social/unfollow/2",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"social",
+						"unfollow",
+						"2"
+					]
+				},
+				"description": "Generated from cURL: curl -X DELETE http://localhost:3000/social/unfollow/2 \\\n  -H \"Authorization: Bearer <TOKEN>\""
+			},
+			"response": []
+		},
+		{
+			"name": "followers",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/social/followers/3?page=1&limit=5",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"social",
+						"followers",
+						"3"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "5"
+						}
+					]
+				},
+				"description": "Generated from cURL: curl \"http://localhost:3000/social/followers/2?page=1&limit=5\" \\\n  -H \"Authorization: Bearer <TOKEN>\""
+			},
+			"response": []
+		},
+		{
+			"name": "following",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/social/following/3?page=1&limit=5",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"social",
+						"following",
+						"3"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "5"
+						}
+					]
+				},
+				"description": "Generated from cURL: curl \"http://localhost:3000/social/following/2?page=1&limit=5\" \\\n  -H \"Authorization: Bearer <TOKEN>\""
+			},
+			"response": []
+		},
+		{
+			"name": "social-stats",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/social/stats/3",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"social",
+						"stats",
+						"3"
+					]
+				},
+				"description": "Generated from cURL: curl http://localhost:3000/social/stats/2 \\\n  -H \"Authorization: Bearer <TOKEN>\""
+			},
+			"response": []
+		},
+		{
+			"name": "users.bulk",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"userIds\":[1,2,3]}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/user/bulk",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"user",
+						"bulk"
+					]
+				},
+				"description": "Generated from cURL: curl -X POST http://localhost:3000/user/bulk \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer <TOKEN>\" \\\n  -d '{\"userIds\":[1,2,3]}'"
+			},
+			"response": []
+		},
+		{
+			"name": "suggestion",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{accessToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/social/suggestions",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"social",
+						"suggestions"
+					]
+				},
+				"description": "Generated from cURL: curl http://localhost:3000/social/suggestions \\\n  -H \"Authorization: Bearer <TOKEN>\""
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:4001"
+		},
+		{
+			"key": "accessToken",
+			"value": ""
+		},
+		{
+			"key": "refreshToken",
+			"value": ""
+		}
+	]
 }
